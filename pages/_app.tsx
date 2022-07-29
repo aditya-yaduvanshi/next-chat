@@ -7,17 +7,17 @@ import {useAuthState} from 'react-firebase-hooks/auth';
 import {useCallback, useEffect} from 'react';
 import {addDoc, collection} from 'firebase/firestore';
 import {useCollectionData} from 'react-firebase-hooks/firestore';
-import { NextRouter, useRouter } from 'next/router';
+import {NextRouter, useRouter} from 'next/router';
+import Head from 'next/head';
 
 function MyApp({Component, pageProps}: AppProps) {
 	const [user, loading, _err] = useAuthState(auth);
 	const [users] = useCollectionData(collection(db, 'users'));
-	const router:NextRouter = useRouter();
+	const router: NextRouter = useRouter();
 
 	const addUser = useCallback(async () => {
 		if (!user) return;
-		if (users?.find((usr) => usr.email === user.email))
-			return;
+		if (users?.find((usr) => usr.email === user.email)) return;
 		try {
 			await addDoc(collection(db, 'users'), {
 				name: user.displayName,
@@ -30,29 +30,36 @@ function MyApp({Component, pageProps}: AppProps) {
 	}, [users]);
 
 	useEffect(() => {
-		if(!user) {
-			router.replace("/");
+		if (!user) {
+			router.replace('/');
 			return;
 		}
 		addUser();
 	}, [user]);
 
 	return (
-		<ChakraProvider>
-			{loading && (
-				<Center h='100vh'>
-					<Spinner size='xl' />
-				</Center>
-			)}
-			{user ? (
-				<Flex overflow='hidden' h='100vh'>
-					<Sidebar />
-					<Component {...pageProps} />
-				</Flex>
-			) : (
-				<Signin />
-			)}
-		</ChakraProvider>
+		<>
+			<Head>
+				<title>Realtime</title>
+				<meta name='description' content='Realtime communication app.' />
+				<link rel='icon' href='/realtime.png' />
+			</Head>
+			<ChakraProvider>
+				{loading && (
+					<Center h='100vh'>
+						<Spinner size='xl' />
+					</Center>
+				)}
+				{user ? (
+					<Flex overflow='hidden' h='100vh'>
+						<Sidebar />
+						<Component {...pageProps} />
+					</Flex>
+				) : (
+					<Signin />
+				)}
+			</ChakraProvider>
+		</>
 	);
 }
 
