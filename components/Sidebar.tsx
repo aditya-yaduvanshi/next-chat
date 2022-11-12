@@ -9,32 +9,87 @@ import ContactModal from './ContactModal';
 import Contacts from './Contacts';
 import Chats from './Chats';
 import ChatModal from './ChatModal';
-import {collection, query, where, onSnapshot, orderBy, limit} from 'firebase/firestore';
+import {
+	collection,
+	query,
+	where,
+	onSnapshot,
+	orderBy,
+	doc,
+	updateDoc,
+	getDoc,
+	getDocs,
+} from 'firebase/firestore';
 import CallModal from './CallModal';
-import { useRouter } from 'next/router';
+import {useRouter} from 'next/router';
 
 const Sidebar: React.FC = (): JSX.Element => {
 	const [user] = useAuthState(auth);
 	const router = useRouter();
 	const [tab, setTab] = useState<string>('chats');
 
-	const newCallQuery = query(collection(db, "videos"), where("ended", "==", false), where('joiners', 'array-contains', user?.uid), where('createdBy', '!=', user?.uid), orderBy('createdBy'), orderBy('startedAt', 'desc'), limit(1));
+	const newCallQuery = query(
+		collection(db, 'videos'),
+		where('ended', '==', false),
+		where('joiners', 'array-contains', user?.uid),
+		where('createdBy', '!=', user?.uid),
+		where('responded', '==', false),
+		orderBy('createdBy'),
+		orderBy('startedAt', 'desc')
+	);
 
 	const [callModal, setCallModal] = useState(false);
-	const [newCall, setNewCall] = useState<{id: string}>();
+	const [newCall, setNewCall] = useState<{
+		id: string;
+		username: string;
+		avatar: string;
+	}>();
+
+	const acceptCall = async () => {
+		setCallModal(false);
+		if (!newCall) return;
+		const videoDoc = doc(db, 'videos', newCall.id);
+		try {
+			await updateDoc(videoDoc, {responded: true});
+			router.push('/videos/' + newCall.id);
+		} catch (err) {
+			console.log('Error Answering The Call: ', err);
+		}
+	};
+
+	const rejectCall = async () => {
+		setCallModal(false);
+		if (!newCall) return;
+		const videoDoc = doc(db, 'videos', newCall.id);
+		try {
+			await updateDoc(videoDoc, {responded: true, ended: true});
+		} catch (err) {
+			console.log('Error Answering The Call: ', err);
+		}
+	};
 
 	useEffect(() => {
-		
-		const unsubscribe = onSnapshot(newCallQuery, (querySnapshot) => {
+		const unsubscribe = onSnapshot(newCallQuery, async (querySnapshot) => {
 			let callDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-			if(!callDoc) return;
-			if(newCall?.id === callDoc.id) return;
-			setNewCall({id: callDoc.id, ...callDoc.data()});
+			if (!callDoc) return;
+			if(newCall) return;
+			let callerId = callDoc
+				.get('joiners')
+				.find((joiner: string) => joiner !== user?.uid) as string;
+			let caller = (await getDocs(query(collection(db, 'users'), where('uid', '==', callerId)))).docs[0];
+			setNewCall({
+				id: callDoc.id,
+				...callDoc.data(),
+				username: caller.get('name'),
+				avatar: caller.get('avatar'),
+			});
 			setCallModal(true);
 		});
 
-		return () => unsubscribe();
-	}, [newCallQuery]);
+		return () => {
+			unsubscribe();
+		}
+	}, [newCallQuery, user]);
 
 	return (
 		<Flex
@@ -103,11 +158,13 @@ const Sidebar: React.FC = (): JSX.Element => {
 				</Flex>
 				{tab === 'chats' ? <Chats /> : <Contacts />}
 			</Flex>
-			<CallModal isOpen={callModal} onClose={() => setCallModal(false)} onAccept={() => {
-				setCallModal(false);
-				router.push('/videos/' + newCall?.id);
-				setNewCall(undefined);
-			}} />
+			<CallModal
+				isOpen={callModal}
+				onReject={rejectCall}
+				onAccept={acceptCall}
+				username={newCall?.username}
+				avatar={newCall?.avatar}
+			/>
 		</Flex>
 	);
 };

@@ -1,9 +1,10 @@
 import {
+	Avatar,
 	Button,
 	Flex,
 	Modal,
 	ModalBody,
-	ModalCloseButton,
+	Text,
 	ModalContent,
 	ModalHeader,
 	ModalOverlay,
@@ -11,34 +12,64 @@ import {
 import React from 'react';
 
 type CallModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onAccept: () => void;
+	isOpen: boolean;
+	onReject: () => void;
+	onAccept: () => void;
+	avatar?: string;
+	username?: string;
 };
 
 const CallModal: React.FC<CallModalProps> = ({
-  isOpen,
-  onClose,
-  onAccept
+	isOpen,
+	onReject,
+	onAccept,
+	username,
+	avatar,
 }): JSX.Element => {
-
 	return (
 		<>
-			<Modal isOpen={isOpen} onClose={onClose}>
+			<Modal isOpen={isOpen} onClose={() => {}}>
 				<ModalOverlay />
 				<ModalContent pb='5'>
-					<ModalHeader>Someone is Calling...</ModalHeader>
-					<ModalCloseButton />
+					<ModalHeader>Incoming...</ModalHeader>
 					<ModalBody>
 						<Flex
 							overflowY='auto'
-							justifyContent='space-between'
-							
+							direction='column'
 							p='2'
 							scrollBehavior='smooth'
+							gap='5'
 						>
-							<Button onClick={onClose}>Reject</Button>
-              <Button onClick={onAccept}>Accept</Button>
+							<Flex
+								justifyContent='center'
+								direction='column'
+								alignItems='center'
+							>
+								<Avatar src={avatar ?? ''} size='2xl' />
+								<Text fontSize='large'>{username ?? 'Unknown'}</Text>
+							</Flex>
+							<Flex justifyContent='space-between' gap='3'>
+								<Button
+									onClick={onReject}
+									variant='solid'
+									bgColor='red.500'
+									w='full'
+									color='white'
+									_hover={{bgColor: 'red.300'}}
+								>
+									Reject
+								</Button>
+								<Button
+									onClick={onAccept}
+									variant='solid'
+									bgColor='green.500'
+									w='full'
+									color='white'
+									_hover={{bgColor: 'green.300'}}
+								>
+									Accept
+								</Button>
+							</Flex>
 						</Flex>
 					</ModalBody>
 				</ModalContent>
