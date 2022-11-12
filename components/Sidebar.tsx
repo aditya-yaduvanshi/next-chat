@@ -1,18 +1,40 @@
 import {ArrowForwardIcon} from '@chakra-ui/icons';
-import {Button, Flex, IconButton, useDisclosure} from '@chakra-ui/react';
-import React, {useState} from 'react';
+import {Button, Flex, IconButton} from '@chakra-ui/react';
+import React, {useEffect, useState} from 'react';
 import User from './User';
-import {auth} from '../firebaseconfig';
+import {auth, db} from '../firebaseconfig';
 import {signOut} from 'firebase/auth';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import ContactModal from './ContactModal';
 import Contacts from './Contacts';
 import Chats from './Chats';
 import ChatModal from './ChatModal';
+import {collection, query, where, onSnapshot, orderBy, limit} from 'firebase/firestore';
+import CallModal from './CallModal';
+import { useRouter } from 'next/router';
 
 const Sidebar: React.FC = (): JSX.Element => {
 	const [user] = useAuthState(auth);
+	const router = useRouter();
 	const [tab, setTab] = useState<string>('chats');
+
+	const newCallQuery = query(collection(db, "videos"), where("ended", "==", false), where('joiners', 'array-contains', user?.uid), where('createdBy', '!=', user?.uid), orderBy('createdBy'), orderBy('startedAt', 'desc'), limit(1));
+
+	const [callModal, setCallModal] = useState(false);
+	const [newCall, setNewCall] = useState<{id: string}>();
+
+	useEffect(() => {
+		
+		const unsubscribe = onSnapshot(newCallQuery, (querySnapshot) => {
+			let callDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+			if(!callDoc) return;
+			if(newCall?.id === callDoc.id) return;
+			setNewCall({id: callDoc.id, ...callDoc.data()});
+			setCallModal(true);
+		});
+
+		return () => unsubscribe();
+	}, [newCallQuery]);
 
 	return (
 		<Flex
@@ -81,6 +103,11 @@ const Sidebar: React.FC = (): JSX.Element => {
 				</Flex>
 				{tab === 'chats' ? <Chats /> : <Contacts />}
 			</Flex>
+			<CallModal isOpen={callModal} onClose={() => setCallModal(false)} onAccept={() => {
+				setCallModal(false);
+				router.push('/videos/' + newCall?.id);
+				setNewCall(undefined);
+			}} />
 		</Flex>
 	);
 };

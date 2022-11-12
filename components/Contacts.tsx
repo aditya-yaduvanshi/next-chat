@@ -1,7 +1,7 @@
 import {auth, db} from '../firebaseconfig';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import {useCollection} from 'react-firebase-hooks/firestore';
-import {collection} from 'firebase/firestore';
+import {collection, query, where} from 'firebase/firestore';
 import UserChat from './UserChat';
 import {Center, Spinner} from '@chakra-ui/react';
 
@@ -19,7 +19,7 @@ interface IContactProps {
 
 const Contacts: React.FC<IContactProps> = ({contactChooser}): JSX.Element => {
 	const [user] = useAuthState(auth);
-	const [contacts, loading, error] = useCollection(collection(db, 'contacts'));
+	const [contacts, loading, error] = useCollection(query(collection(db, 'contacts'), where('user', '==', user?.email)));
 	const [chats] = useCollection(collection(db, 'chats'));
 	const doc = contacts?.docs
 		.find((doc) => doc.data().user === user?.email)

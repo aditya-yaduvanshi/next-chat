@@ -5,19 +5,18 @@ import Sidebar from '../components/Sidebar';
 import {auth, db} from '../firebaseconfig';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import {useCallback, useEffect} from 'react';
-import {addDoc, collection} from 'firebase/firestore';
-import {useCollectionData} from 'react-firebase-hooks/firestore';
+import {addDoc, collection, getDocs, query, where} from 'firebase/firestore';
 import {NextRouter, useRouter} from 'next/router';
 import Head from 'next/head';
 
 function MyApp({Component, pageProps}: AppProps) {
 	const [user, loading, _err] = useAuthState(auth);
-	const [users] = useCollectionData(collection(db, 'users'));
 	const router: NextRouter = useRouter();
 
 	const addUser = useCallback(async () => {
 		if (!user) return;
-		if (users?.find((usr) => usr.email === user.email)) return;
+		const users = await getDocs(query(collection(db, 'users'), where('email', '==', user?.email)))
+		if (users.docs.length) return;
 		try {
 			await addDoc(collection(db, 'users'), {
 				name: user.displayName,
@@ -27,7 +26,7 @@ function MyApp({Component, pageProps}: AppProps) {
 				avatar: user.photoURL,
 			});
 		} catch (err) {}
-	}, [users]);
+	}, [user]);
 
 	useEffect(() => {
 		if (!user) {

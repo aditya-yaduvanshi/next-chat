@@ -39,7 +39,7 @@ const Chat: NextPage = () => {
 	return (
 		<>
 			<Head>
-				<title>Chat</title>
+				<title>In A Chat</title>
 			</Head>
 			<Flex
 				direction='column'
@@ -53,6 +53,7 @@ const Chat: NextPage = () => {
 					username={otherUser?.name}
 					avatar={otherUser?.avatar}
 					loading={loading}
+					uid={otherUser?.uid}
 				/>
 				<Flex
 					direction='column'

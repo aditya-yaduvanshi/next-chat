@@ -21,7 +21,7 @@ const ChatsIndex: NextPage = () => {
 	return (
 		<>
 			<Head>
-				<title>Chat</title>
+				<title>Chats</title>
 			</Head>
 			<Flex
 				direction='column'
