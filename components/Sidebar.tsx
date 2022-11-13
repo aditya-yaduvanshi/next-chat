@@ -17,7 +17,6 @@ import {
 	orderBy,
 	doc,
 	updateDoc,
-	getDoc,
 	getDocs,
 } from 'firebase/firestore';
 import CallModal from './CallModal';
@@ -27,6 +26,7 @@ const Sidebar: React.FC = (): JSX.Element => {
 	const [user] = useAuthState(auth);
 	const router = useRouter();
 	const [tab, setTab] = useState<string>('chats');
+	const [incoming, setIncoming] = useState<HTMLAudioElement>();
 
 	const newCallQuery = query(
 		collection(db, 'videos'),
@@ -34,8 +34,9 @@ const Sidebar: React.FC = (): JSX.Element => {
 		where('joiners', 'array-contains', user?.uid),
 		where('createdBy', '!=', user?.uid),
 		where('responded', '==', false),
-		orderBy('createdBy'),
-		orderBy('startedAt', 'desc')
+		where('online', '==', true),
+		orderBy('createdBy', 'desc'),
+		orderBy('startedAt', 'desc'),
 	);
 
 	const [callModal, setCallModal] = useState(false);
@@ -44,6 +45,12 @@ const Sidebar: React.FC = (): JSX.Element => {
 		username: string;
 		avatar: string;
 	}>();
+
+	useEffect(() => {
+		const audio = new Audio('/incoming.mp3');
+		audio.loop = true;
+		setIncoming(audio);
+	}, []);
 
 	const acceptCall = async () => {
 		setCallModal(false);
@@ -55,6 +62,7 @@ const Sidebar: React.FC = (): JSX.Element => {
 		} catch (err) {
 			console.log('Error Answering The Call: ', err);
 		}
+		incoming?.pause();
 	};
 
 	const rejectCall = async () => {
@@ -64,14 +72,22 @@ const Sidebar: React.FC = (): JSX.Element => {
 		try {
 			await updateDoc(videoDoc, {responded: true, ended: true});
 		} catch (err) {
-			console.log('Error Answering The Call: ', err);
+			console.log('Error Rejecting The Call: ', err);
 		}
+		incoming?.pause();
 	};
 
 	useEffect(() => {
 		const unsubscribe = onSnapshot(newCallQuery, async (querySnapshot) => {
 			let callDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
 			if (!callDoc) return;
+			let docUnsub = onSnapshot(callDoc.ref, async (docSnapshot) => {
+				if(docSnapshot.get('ended') || !docSnapshot.get('online')) {
+					setCallModal(false);
+					incoming?.pause();
+					docUnsub();
+				}
+			})
 			if(newCall) return;
 			let callerId = callDoc
 				.get('joiners')
@@ -84,6 +100,8 @@ const Sidebar: React.FC = (): JSX.Element => {
 				avatar: caller.get('avatar'),
 			});
 			setCallModal(true);
+			
+			await incoming?.play();
 		});
 
 		return () => {

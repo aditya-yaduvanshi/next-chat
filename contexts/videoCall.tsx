@@ -43,8 +43,7 @@ export const VideoCallProvider: React.FC<PropsWithChildren<{}>> = ({
 	const router = useRouter();
 	const videoCallId = router.pathname.split('/')[1];
 	const videoDoc = doc(db, 'videos', videoCallId);
-	const videoCall = useDocument(videoDoc)[0];
-	const receivedCall = videoCall?.get('createdBy') !== user?.uid;
+	
 	const offerCandidates = collection(
 		db,
 		'videos',
@@ -58,22 +57,54 @@ export const VideoCallProvider: React.FC<PropsWithChildren<{}>> = ({
 		'answerCandidates'
 	);
 
-	const joinVideoCall: IVideoCallContext['joinVideoCall'] = () => {
-		if (!peer) return;
+	const joinVideoCall: IVideoCallContext['joinVideoCall'] = async () => {
+		const peer = new RTCPeerConnection({
+			iceCandidatePoolSize: 10,
+			iceServers: [
+				{
+					urls: [
+						'stun:stun1.l.google.com:19302',
+						'stun:stun2.l.google.com:19302',
+					],
+				},
+			],
+		});
 
-		if (receivedCall) {
+		navigator.mediaDevices
+			.getUserMedia({audio: true, video: true})
+			.then((localStream) => {
+				localStream.getTracks().forEach((track) => {
+					peer.addTrack(track, localStream);
+				});
+				if (localVideoRef.current)
+					localVideoRef.current.srcObject = localStream;
+			});
+
+		const remoteStream = new MediaStream();
+
+		peer.ontrack = ({streams}) => {
+			streams[0].getTracks().forEach((track) => {
+				console.log(track)
+				remoteStream.addTrack(track);
+			});
+		};
+
+		if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+
+		setPeer(peer);
+
+		const videoCall = await getDoc(videoDoc);
+
+		if (videoCall.get('createdBy') !== user?.uid) {
 			peer.onicecandidate = async ({candidate}) => {
 				candidate && (await addDoc(answerCandidates, candidate.toJSON()));
 			};
 
-			getDoc(videoDoc).then((video) => {
-				const data = video.data();
-				data &&
-					peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-			});
+			videoCall.data() &&
+					peer.setRemoteDescription(new RTCSessionDescription(videoCall.get('offer')));
 
 			peer.createAnswer().then(async (answerDescription) => {
-				await peer.setLocalDescription(answerDescription);
+				peer.setLocalDescription(answerDescription);
 				await updateDoc(videoDoc, {answer: answerDescription});
 			});
 
@@ -91,7 +122,7 @@ export const VideoCallProvider: React.FC<PropsWithChildren<{}>> = ({
 			};
 
 			peer.createOffer().then(async (offerDescription) => {
-				await peer.setLocalDescription(offerDescription);
+				peer.setLocalDescription(offerDescription);
 				await updateDoc(videoDoc, {offer: offerDescription});
 			});
 
@@ -121,42 +152,6 @@ export const VideoCallProvider: React.FC<PropsWithChildren<{}>> = ({
 			router.back();
 		}).catch(err => console.log(err));
 	};
-
-	useEffect(() => {
-		const peer = new RTCPeerConnection({
-			iceCandidatePoolSize: 10,
-			iceServers: [
-				{
-					urls: [
-						'stun:stun1.l.google.com:19302',
-						'stun:stun2.l.google.com:19302',
-					],
-				},
-			],
-		});
-
-		navigator.mediaDevices
-			.getUserMedia({audio: true, video: true})
-			.then((localStream) => {
-				localStream.getTracks().forEach((track) => {
-					peer.addTrack(track, localStream);
-				});
-				if (localVideoRef.current)
-					localVideoRef.current.srcObject = localStream;
-			});
-
-		const remoteStream = new MediaStream();
-
-		peer.ontrack = ({streams}) => {
-			streams[0].getTracks().forEach((track) => {
-				remoteStream.addTrack(track);
-			});
-		};
-
-		if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
-
-		setPeer(peer);
-	}, []);
 
 	return (
 		<VideoCallContext.Provider

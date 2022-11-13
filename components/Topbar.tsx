@@ -47,6 +47,13 @@ const Topbar: React.FC<ITopbar> = ({
 	const router = useRouter();
 	const [isOpen, setIsOpen] = useState(false);
 	const [call, setCall] = useState<DocumentReference<DocumentData>>();
+	const [outgoing, setOutgoing] = useState<HTMLAudioElement>();
+
+	useEffect(() => {
+		const audio = new Audio('/outgoing.mp3');
+		audio.loop = true;
+		setOutgoing(audio);
+	}, []);
 
 	const makeVideoCall = async () => {
 		setIsOpen(true);
@@ -59,8 +66,10 @@ const Topbar: React.FC<ITopbar> = ({
 				startedAt: serverTimestamp(),
 				ended: false,
 				responded: false,
+				online: true,
 			});
 			setCall(videoCall);
+			await outgoing?.play();
 		} catch (err) {
 			console.log('Error Making Video Call: ', err);
 			setIsOpen(false);
@@ -73,10 +82,12 @@ const Topbar: React.FC<ITopbar> = ({
 		try {
 			await updateDoc(videoCall, {
 				ended: true,
+				online: false,
 			});
 		} catch (err) {
 			console.log('Error Making Video Call: ', err);
 		}
+		outgoing?.pause();
 		setIsOpen(false);
 	};
 
@@ -84,6 +95,7 @@ const Topbar: React.FC<ITopbar> = ({
 		if (!call) return;
 		const unsubscribe = onSnapshot(call, (snapshot) => {
 			if (!snapshot.get('responded')) return;
+			outgoing?.pause();
 			setIsOpen(false);
 			if(snapshot.get('ended')) return;
 			router.push('/videos/' + call.id);
